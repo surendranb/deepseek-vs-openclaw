@@ -1,0 +1,367 @@
+#!/usr/bin/env python3
+"""
+generate_chart.py — 🐋 vs 🦞 Star Growth Tracker
+
+- Fetches live GitHub star metrics
+- Updates data.json and stars.csv
+- Generates chart.svg with weekly vertical lines
+- Generates high-res 1200x630 og-image.png for LinkedIn/X rich social cards
+- Updates index.html OpenGraph and Twitter metadata tags dynamically
+"""
+
+import json
+import os
+import re
+import urllib.request
+from datetime import datetime, timezone, date
+from PIL import Image, ImageDraw, ImageFont
+
+REPOS = {
+    "deepseek_harness": {
+        "repo": "deepseek-ai/deepseek-harness",
+        "name": "deepseek-ai/deepseek-harness",
+        "label": "🐋 deepseek-ai/deepseek-harness",
+        "emoji": "🐋",
+        "start_date": date(2026, 8, 13),
+        "color": "#0284c7",
+        "stroke_width": 3.5
+    },
+    "openclaw": {
+        "repo": "openclaw/openclaw",
+        "name": "openclaw/openclaw",
+        "label": "🦞 openclaw/openclaw",
+        "emoji": "🦞",
+        "start_date": date(2025, 11, 24),
+        "color": "#e11d48",
+        "stroke_width": 3.0
+    }
+}
+
+DATA_PATH = "data.json"
+CSV_PATH = "stars.csv"
+SVG_PATH = "chart.svg"
+OG_IMAGE_PATH = "og-image.png"
+HTML_PATH = "index.html"
+
+
+def fetch_stars(repo_full_name: str) -> int | None:
+    """Fetch live stargazer count from GitHub REST API."""
+    url = f"https://api.github.com/repos/{repo_full_name}"
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "WhaleVsLobster/1.0",
+        "Accept": "application/vnd.github.v3+json"
+    })
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return data.get("stargazers_count")
+    except Exception as e:
+        print(f"[WARN] Failed to fetch stars for {repo_full_name}: {e}")
+        return None
+
+
+def update_data() -> dict:
+    """Update data.json and stars.csv with current day's live star counts."""
+    with open(DATA_PATH, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    today = date.today()
+
+    for key, cfg in REPOS.items():
+        stars = fetch_stars(cfg["repo"])
+        if stars is None:
+            continue
+
+        cfg_data = data["repositories"][key]
+        cfg_data["current_stars"] = stars
+
+        day_num = (today - cfg["start_date"]).days + 1
+        daily_list = cfg_data.get("daily_stars", [])
+
+        while len(daily_list) < day_num:
+            daily_list.append(stars)
+
+        daily_list[day_num - 1] = stars
+        cfg_data["daily_stars"] = daily_list
+
+    data["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    with open(DATA_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+    # Sync stars.csv
+    try:
+        dsh_list = data["repositories"]["deepseek_harness"]["daily_stars"]
+        claw_list = data["repositories"]["openclaw"]["daily_stars"]
+        max_len = max(len(dsh_list), len(claw_list))
+
+        with open(CSV_PATH, "w", encoding="utf-8") as f:
+            f.write("day,whale_deepseek_stars,lobster_openclaw_stars\n")
+            for i in range(max_len):
+                dsh_val = dsh_list[i] if i < len(dsh_list) else ""
+                claw_val = claw_list[i] if i < len(claw_list) else ""
+                f.write(f"{i + 1},{dsh_val},{claw_val}\n")
+    except Exception as e:
+        print(f"[WARN] Failed to sync CSV: {e}")
+
+    return data
+
+
+def generate_og_image(data: dict) -> None:
+    """Render the exact pixel-perfect snapshot card for og-image.png (1200x630)."""
+    dsh = data["repositories"]["deepseek_harness"]["daily_stars"]
+    claw = data["repositories"]["openclaw"]["daily_stars"]
+    dsh_stars = dsh[-1]
+    claw_stars = claw[-1]
+    dsh_day = len(dsh)
+    claw_day = len(claw)
+
+    w, h = 1200, 630
+    img = Image.new('RGBA', (w, h), (255, 255, 255, 255))
+    draw = ImageDraw.Draw(img)
+
+    font_title = font_sub = font_pill = font_stars = font_small = font_emoji = None
+    for p in ['/System/Library/Fonts/SFNS.ttf', '/System/Library/Fonts/HelveticaNeue.ttc', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf']:
+        if os.path.exists(p):
+            try:
+                font_title = ImageFont.truetype(p, 32)
+                font_sub = ImageFont.truetype(p, 15)
+                font_pill = ImageFont.truetype(p, 13)
+                font_stars = ImageFont.truetype(p, 15)
+                font_small = ImageFont.truetype(p, 11)
+                break
+            except:
+                pass
+
+    for ep in ['/System/Library/Fonts/Apple Color Emoji.ttc', '/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf']:
+        if os.path.exists(ep):
+            try:
+                font_emoji = ImageFont.truetype(ep, 64)
+                break
+            except:
+                pass
+
+    if not font_title:
+        font_title = font_sub = font_pill = font_stars = font_small = ImageFont.load_default()
+
+    def draw_emoji(text, x, y, target_size=28):
+        if font_emoji:
+            temp = Image.new('RGBA', (96, 96), (255, 255, 255, 0))
+            d = ImageDraw.Draw(temp)
+            try:
+                d.text((10, 10), text, font=font_emoji, embedded_color=True)
+                resized = temp.resize((target_size, target_size), Image.Resampling.LANCZOS)
+                img.paste(resized, (int(x), int(y)), resized)
+                return target_size
+            except:
+                pass
+        return 0
+
+    # 1. Header Title & Subtitle
+    draw_emoji('🐋', 48, 30, 36)
+    draw.text((92, 32), 'vs', fill='#09090b', font=font_title)
+    draw_emoji('🦞', 132, 30, 36)
+
+    draw.text((48, 76), '📈 The battle is on. Bring the 🍿 · Updated hourly', fill='#71717a', font=font_sub)
+
+    # 2. Scoreboard Pills
+    # Pill 1: Whale
+    p1_x, p1_y, p1_w, p1_h = 48, 112, 450, 42
+    draw.rounded_rectangle([p1_x, p1_y, p1_x + p1_w, p1_y + p1_h], radius=10, fill='#fafafa', outline='#e4e4e7', width=1)
+    draw.ellipse([p1_x + 14, p1_y + 16, p1_x + 24, p1_y + 26], fill='#0284c7')
+    draw_emoji('🐋', p1_x + 32, p1_y + 11, 20)
+    draw.text((p1_x + 58, p1_y + 13), 'deepseek-ai/deepseek-harness', fill='#09090b', font=font_pill)
+    draw.line([(p1_x + 280, p1_y + 8), (p1_x + 280, p1_y + 34)], fill='#e4e4e7', width=1)
+    draw.text((p1_x + 292, p1_y + 12), f'{dsh_stars:,} ★', fill='#0284c7', font=font_stars)
+    draw.text((p1_x + 395, p1_y + 14), f'Day {dsh_day}', fill='#71717a', font=font_small)
+
+    # VS
+    draw.text((512, 124), 'VS', fill='#a1a1aa', font=font_pill)
+
+    # Pill 2: Lobster
+    p2_x, p2_y, p2_w, p2_h = 548, 112, 410, 42
+    draw.rounded_rectangle([p2_x, p2_y, p2_x + p2_w, p2_y + p2_h], radius=10, fill='#fafafa', outline='#e4e4e7', width=1)
+    draw.ellipse([p2_x + 14, p2_y + 16, p2_x + 24, p2_y + 26], fill='#e11d48')
+    draw_emoji('🦞', p2_x + 32, p2_y + 11, 20)
+    draw.text((p2_x + 58, p2_y + 13), 'openclaw/openclaw', fill='#09090b', font=font_pill)
+    draw.line([(p2_x + 215, p2_y + 8), (p2_x + 215, p2_y + 34)], fill='#e4e4e7', width=1)
+    draw.text((p2_x + 227, p2_y + 12), f'{claw_stars:,} ★', fill='#e11d48', font=font_stars)
+    draw.text((p2_x + 335, p2_y + 14), f'Day {claw_day}', fill='#71717a', font=font_small)
+
+    # 3. Chart Arena
+    cx, cy, cw, ch = 65, 178, 1085, 395
+    max_stars = 450000
+    max_days = max(len(dsh), len(claw))
+
+    # Horizontal Guidelines & Labels
+    for stars_val in range(0, max_stars + 1, 90000):
+        y = cy + ch - (stars_val / max_stars) * ch
+        draw.line([(cx, y), (cx + cw, y)], fill='#f1f1f4', width=1)
+        lbl = '0' if stars_val == 0 else f'{stars_val//1000}k'
+        draw.text((cx - 36, y - 7), lbl, fill='#71717a', font=font_small)
+
+    # Vertical Weekly Grid & Labels
+    for w_idx in range(1, 39):
+        x = cx + ((w_idx * 7 - 1) / (max_days - 1)) * cw
+        draw.line([(x, cy), (x, cy + ch)], fill='#f1f1f4', width=1)
+        if w_idx in [1, 4, 8, 12, 16, 20, 24, 28, 32, 38]:
+            lbl = 'Day 1' if w_idx == 1 else f'W{w_idx}'
+            draw.text((x - 12, cy + ch + 8), lbl, fill='#71717a', font=font_small)
+
+    # Plot Lines
+    def get_pts(series):
+        pts = []
+        for i, v in enumerate(series):
+            x = cx + (i / (max_days - 1)) * cw
+            y = cy + ch - (v / max_stars) * ch
+            pts.append((x, y))
+        return pts
+
+    claw_pts = get_pts(claw)
+    dsh_pts = get_pts(dsh)
+
+    draw.line(claw_pts, fill='#e11d48', width=4)
+    draw.line(dsh_pts, fill='#0284c7', width=5)
+
+    # Endpoints with Emojis
+    claw_last = claw_pts[-1]
+    dsh_last = dsh_pts[-1]
+
+    draw_emoji('🐋', dsh_last[0] + 6, dsh_last[1] - 12, 26)
+    draw_emoji('🦞', claw_last[0] - 28, claw_last[1] - 24, 26)
+
+    # Watermark
+    draw.text((48, 602), 'surendranb.github.io/deepseek-vs-openclaw 🍿', fill='#a1a1aa', font=font_small)
+
+    final_img = img.convert('RGB')
+    final_img.save(OG_IMAGE_PATH, 'PNG')
+    print(f"[SUCCESS] Updated pixel-perfect {OG_IMAGE_PATH} (1200x630)")
+
+
+def update_html_meta(data: dict) -> None:
+    """Update index.html OpenGraph description & title with live hourly numbers (Option B)."""
+    dsh_stars = data["repositories"]["deepseek_harness"]["daily_stars"][-1]
+    claw_stars = data["repositories"]["openclaw"]["daily_stars"][-1]
+    dsh_day = len(data["repositories"]["deepseek_harness"]["daily_stars"])
+    claw_day = len(data["repositories"]["openclaw"]["daily_stars"])
+
+    og_title = "🐋 vs 🦞 · The Battle for GitHub's Fastest-Growing Repo"
+    og_desc = f"OpenClaw took 9 months to hit {claw_stars:,} stars. DeepSeek Harness crossed {dsh_stars:,} ★ in just {dsh_day} days. Watch the race live 🍿"
+
+    if not os.path.exists(HTML_PATH):
+        return
+
+    with open(HTML_PATH, "r", encoding="utf-8") as f:
+        html = f.read()
+
+    html = re.sub(r'<meta property="og:title" content="[^"]*">', f'<meta property="og:title" content="{og_title}">', html)
+    html = re.sub(r'<meta name="twitter:title" content="[^"]*">', f'<meta name="twitter:title" content="{og_title}">', html)
+    html = re.sub(r'<meta property="og:description" content="[^"]*">', f'<meta property="og:description" content="{og_desc}">', html)
+    html = re.sub(r'<meta name="twitter:description" content="[^"]*">', f'<meta name="twitter:description" content="{og_desc}">', html)
+
+    with open(HTML_PATH, "w", encoding="utf-8") as f:
+        f.write(html)
+
+    print(f"[SUCCESS] Updated {HTML_PATH} dynamic social metadata tags")
+
+
+def build_svg(data: dict) -> None:
+    """Generate high-contrast SVG chart with weekly vertical grid lines."""
+    dsh = data["repositories"]["deepseek_harness"]["daily_stars"]
+    claw = data["repositories"]["openclaw"]["daily_stars"]
+
+    max_days = max(len(dsh), len(claw))
+    max_stars = 450000
+
+    width, height = 960, 500
+    pad_left, pad_right, pad_top, pad_bottom = 65, 45, 55, 50
+    chart_w = width - pad_left - pad_right
+    chart_h = height - pad_top - pad_bottom
+
+    def x_coord(day_idx: int) -> float:
+        if max_days <= 1:
+            return pad_left
+        return pad_left + (day_idx / (max_days - 1)) * chart_w
+
+    def y_coord(val: int) -> float:
+        return pad_top + chart_h - (val / max_stars) * chart_h
+
+    def points_to_path(vals: list[int]) -> str:
+        pts = [f"{x_coord(i):.1f},{y_coord(v):.1f}" for i, v in enumerate(vals)]
+        return "M " + " L ".join(pts)
+
+    dsh_path = points_to_path(dsh)
+    claw_path = points_to_path(claw)
+
+    dsh_tip_x = x_coord(len(dsh) - 1)
+    dsh_tip_y = y_coord(dsh[-1])
+    claw_tip_x = x_coord(len(claw) - 1)
+    claw_tip_y = y_coord(claw[-1])
+
+    y_ticks_svg = []
+    for val in range(0, max_stars + 1, 90000):
+        y = y_coord(val)
+        lbl = "0" if val == 0 else f"{val//1000}k"
+        y_ticks_svg.append(f'<line x1="{pad_left}" y1="{y:.1f}" x2="{width - pad_right}" y2="{y:.1f}" stroke="#f4f4f5" stroke-width="1"/>')
+        y_ticks_svg.append(f'<text x="{pad_left - 10}" y="{y + 4:.1f}" font-size="11.5" fill="#71717a" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, sans-serif">{lbl}</text>')
+
+    x_ticks_svg = []
+    total_weeks = max_days // 7
+
+    for w in range(1, total_weeks + 1):
+        day = w * 7
+        x = x_coord(day - 1)
+        x_ticks_svg.append(f'<line x1="{x:.1f}" y1="{pad_top}" x2="{x:.1f}" y2="{pad_top + chart_h}" stroke="#f4f4f5" stroke-width="1"/>')
+        if w in [1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, total_weeks]:
+            lbl = f"W{w}"
+            x_ticks_svg.append(f'<text x="{x:.1f}" y="{height - pad_bottom + 16}" font-size="11" fill="#71717a" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif">{lbl}</text>')
+
+    x1 = x_coord(0)
+    x_ticks_svg.append(f'<text x="{x1:.1f}" y="{height - pad_bottom + 16}" font-size="11" fill="#71717a" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif">Day 1</text>')
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" width="100%" height="100%" style="background:#ffffff;border:1px solid #e4e4e7;border-radius:14px;">
+  <!-- Header / Scoreboard -->
+  <g transform="translate({pad_left}, 28)">
+    <text x="0" y="4" font-size="16" font-weight="900" fill="#09090b" font-family="-apple-system, BlinkMacSystemFont, sans-serif">🐋 vs 🦞</text>
+    <text x="75" y="4" font-size="12" fill="#71717a" font-family="-apple-system, BlinkMacSystemFont, sans-serif">📈 The battle is on · Bring the 🍿</text>
+    
+    <g transform="translate(320, 0)">
+      <circle cx="6" cy="0" r="4.5" fill="#0284c7"/>
+      <text x="16" y="4" font-size="12" font-weight="700" fill="#0284c7" font-family="-apple-system, BlinkMacSystemFont, sans-serif">🐋 deepseek-ai/deepseek-harness</text>
+    </g>
+
+    <g transform="translate(600, 0)">
+      <circle cx="6" cy="0" r="4.5" fill="#e11d48"/>
+      <text x="16" y="4" font-size="12" font-weight="700" fill="#e11d48" font-family="-apple-system, BlinkMacSystemFont, sans-serif">🦞 openclaw/openclaw</text>
+    </g>
+  </g>
+
+  <!-- Grid Lines -->
+  {''.join(y_ticks_svg)}
+  {''.join(x_ticks_svg)}
+
+  <!-- Trajectory Lines -->
+  <path d="{claw_path}" fill="none" stroke="#e11d48" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="{dsh_path}" fill="none" stroke="#0284c7" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Live Mascot Emojis on Tips -->
+  <text x="{dsh_tip_x + 6:.1f}" y="{dsh_tip_y + 6:.1f}" font-size="20">🐋</text>
+  <text x="{claw_tip_x - 20:.1f}" y="{claw_tip_y - 8:.1f}" font-size="20">🦞</text>
+
+  <!-- X-Axis Label -->
+  <text x="{width / 2}" y="{height - 8}" font-size="11.5" font-weight="700" fill="#71717a" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif">Weeks since Day 1 inception (each vertical line = 1 week)</text>
+</svg>"""
+
+    with open(SVG_PATH, "w", encoding="utf-8") as f:
+        f.write(svg)
+    print(f"[SUCCESS] Updated {SVG_PATH}")
+
+
+if __name__ == "__main__":
+    updated_data = update_data()
+    build_svg(updated_data)
+    generate_og_image(updated_data)
+    update_html_meta(updated_data)

@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🐋 vs 🦞 | updated every hour</title>
+  <meta name="description" content="📈 The battle is on. Bring the 🍿. Updated hourly">
+  
+  <!-- OpenGraph / Social Metadata -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://surendranb.github.io/deepseek-vs-openclaw/">
+  <meta property="og:title" content="🐋 vs 🦞 · The Battle for GitHub's Fastest-Growing Repo">
+  <meta property="og:description" content="OpenClaw took 9 months to hit 386,424 stars. DeepSeek Harness crossed 119,688 ★ in just 4 days. Watch the race live 🍿">
+  <meta property="og:image" content="https://surendranb.github.io/deepseek-vs-openclaw/og-image.png">
+  <meta property="og:image:secure_url" content="https://surendranb.github.io/deepseek-vs-openclaw/og-image.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="🐋 vs 🦞 GitHub Star Growth Comparison">
+
+  <!-- Twitter / X Metadata -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="🐋 vs 🦞 · The Battle for GitHub's Fastest-Growing Repo">
+  <meta name="twitter:description" content="OpenClaw took 9 months to hit 386,424 stars. DeepSeek Harness crossed 119,688 ★ in just 4 days. Watch the race live 🍿">
+  <meta name="twitter:image" content="https://surendranb.github.io/deepseek-vs-openclaw/og-image.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text-main: #09090b;
+      --text-muted: #71717a;
+      --border: #e4e4e7;
+      --border-subtle: #f4f4f5;
+      --whale-blue: #0284c7;
+      --lobster-red: #e11d48;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      padding: 20px 36px 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app-wrap {
+      height: 100%;
+      max-width: 1180px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .brand-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .brand-title {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Micro-Animations for Mascots */
+    .mascot-whale {
+      display: inline-block;
+      animation: whaleFloat 3.2s ease-in-out infinite;
+      transform-origin: center bottom;
+      cursor: default;
+    }
+
+    .mascot-lobster {
+      display: inline-block;
+      animation: lobsterScuttle 2.8s ease-in-out infinite;
+      transform-origin: center center;
+      cursor: default;
+    }
+
+    @keyframes whaleFloat {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      30% { transform: translateY(-4px) rotate(-3deg); }
+      70% { transform: translateY(2px) rotate(2deg); }
+    }
+
+    @keyframes lobsterScuttle {
+      0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+      25% { transform: translateY(-3px) rotate(4deg) scale(1.05); }
+      75% { transform: translateY(1px) rotate(-3deg) scale(0.98); }
+    }
+
+    .popcorn-pulse {
+      display: inline-block;
+      animation: popcornBounce 2s ease infinite;
+    }
+
+    @keyframes popcornBounce {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15) rotate(5deg); }
+    }
+
+    .brand-sub {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    /* Action Buttons */
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 13px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: #27272a;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+    }
+
+    .btn:hover {
+      background: #f4f4f5;
+      border-color: #d4d4d8;
+      color: var(--text-main);
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-x:hover {
+      background: #000000;
+      color: #ffffff;
+      border-color: #000000;
+    }
+
+    .btn-linkedin:hover {
+      background: #0a66c2;
+      color: #ffffff;
+      border-color: #0a66c2;
+    }
+
+    .btn svg {
+      width: 13px;
+      height: 13px;
+      flex-shrink: 0;
+    }
+
+    /* Unified Matchup Scoreboard */
+    .scoreboard {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .score-card {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 16px;
+      border-radius: 11px;
+      border: 1.5px solid var(--border);
+      background: #fafafa;
+      text-decoration: none;
+      color: var(--text-main);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+
+    .score-card:hover {
+      background: #ffffff;
+      border-color: #a1a1aa;
+      transform: translateY(-1.5px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    }
+
+    .score-card:hover .card-mascot {
+      transform: scale(1.25);
+    }
+
+    .card-mascot {
+      font-size: 15px;
+      transition: transform 0.2s ease;
+      display: inline-block;
+    }
+
+    .score-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .score-card.whale .score-dot {
+      background: var(--whale-blue);
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2);
+    }
+
+    .score-card.lobster .score-dot {
+      background: var(--lobster-red);
+      box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.2);
+    }
+
+    .score-repo {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .score-tally {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13.5px;
+      font-weight: 800;
+      padding-left: 8px;
+      border-left: 1px solid var(--border);
+    }
+
+    .score-card.whale .score-tally { color: var(--whale-blue); }
+    .score-card.lobster .score-tally { color: var(--lobster-red); }
+
+    .score-day {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .vs-badge {
+      font-size: 11.5px;
+      font-weight: 800;
+      color: #a1a1aa;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Chart Arena */
+    .chart-container {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+      width: 100%;
+    }
+
+    /* Animated Floating Endpoint Markers */
+    .floating-mascot {
+      position: absolute;
+      pointer-events: none;
+      font-size: 22px;
+      z-index: 10;
+      transition: all 0.2s ease;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+    }
+
+    .floating-mascot.whale {
+      animation: whaleFloat 2.6s ease-in-out infinite;
+    }
+
+    .floating-mascot.lobster {
+      animation: lobsterScuttle 2.4s ease-in-out infinite;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      background: #09090b;
+      color: #ffffff;
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 10px;
+      box-shadow: 0 10px 20px -4px rgba(0,0,0,0.3);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Compact Footer */
+    footer {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: center;
+      padding-top: 8px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    footer a {
+      color: #27272a;
+      font-weight: 700;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    footer a:hover {
+      color: var(--text-main);
+      text-decoration: underline;
+    }
+
+    .bullet {
+      color: #d4d4d8;
+    }
+
+    @media (max-width: 768px) {
+      html, body {
+        overflow: auto;
+        height: auto;
+      }
+      body {
+        padding: 24px 16px;
+      }
+      .brand-group {
+        width: 100%;
+      }
+      .scoreboard {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .vs-badge {
+        display: none;
+      }
+      .chart-container {
+        height: 380px;
+        flex: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-wrap">
+    <header>
+      <div class="brand-group">
+        <h1 class="brand-title">
+          <span class="mascot-whale" title="DeepSeek">🐋</span>
+          <span>vs</span>
+          <span class="mascot-lobster" title="OpenClaw">🦞</span>
+        </h1>
+        <p class="brand-sub">📈 The battle is on. Bring the 🍿. Updated hourly</p>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-x" id="btnShareX" title="Copy snapshot & share on X">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          <span>Share on X</span>
+        </button>
+
+        <button class="btn btn-linkedin" id="btnShareLinkedIn" title="Copy snapshot & share on LinkedIn">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+          <span>Share on LinkedIn</span>
+        </button>
+
+        <button class="btn" id="btnDownload" title="Download PNG Snapshot">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Download PNG</span>
+        </button>
+
+        <button class="btn" id="btnCopyLink" title="Copy Link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span>Copy Link</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Matchup Scoreboard -->
+    <div class="scoreboard">
+      <a class="score-card whale" href="https://github.com/deepseek-ai/deepseek-harness" target="_blank" rel="noopener">
+        <span class="score-dot"></span>
+        <span class="card-mascot">🐋</span>
+        <span class="score-repo">deepseek-ai/deepseek-harness</span>
+        <span class="score-tally" id="dshStars">118,435 ★</span>
+        <span class="score-day" id="dshDay">Day 4</span>
+      </a>
+
+      <span class="vs-badge">vs</span>
+
+      <a class="score-card lobster" href="https://github.com/openclaw/openclaw" target="_blank" rel="noopener">
+        <span class="score-dot"></span>
+        <span class="card-mascot">🦞</span>
+        <span class="score-repo">openclaw/openclaw</span>
+        <span class="score-tally" id="clawStars">386,424 ★</span>
+        <span class="score-day" id="clawDay">Day 266</span>
+      </a>
+    </div>
+
+    <!-- Chart Arena -->
+    <div class="chart-container">
+      <canvas id="chart"></canvas>
+      <div class="floating-mascot whale" id="floatWhale">🐋</div>
+      <div class="floating-mascot lobster" id="floatLobster">🦞</div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <span>Built with 🍿 by <a href="https://surendranb.com" target="_blank" rel="noopener">Surendran</a></span>
+      <span class="bullet">•</span>
+      <a href="https://github.com/surendranb/deepseek-vs-openclaw" target="_blank" rel="noopener">GitHub Repository</a>
+      <span class="bullet">•</span>
+      <span id="lastUpdated">Updated hourly via GitHub Actions</span>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast">Link copied to clipboard!</div>
+
+  <script>
+    let chartInstance = null;
+
+    function updateFloatingMascots(chart) {
+      const dshMeta = chart.getDatasetMeta(0);
+      const clawMeta = chart.getDatasetMeta(1);
+
+      const floatWhale = document.getElementById('floatWhale');
+      const floatLobster = document.getElementById('floatLobster');
+
+      if (dshMeta.data && dshMeta.data.length > 0) {
+        const pt = dshMeta.data[dshMeta.data.length - 1];
+        if (pt && pt.x !== undefined) {
+          floatWhale.style.left = `${pt.x + 8}px`;
+          floatWhale.style.top = `${pt.y - 12}px`;
+          floatWhale.style.display = 'block';
+        }
+      }
+
+      if (clawMeta.data && clawMeta.data.length > 0) {
+        const pt = clawMeta.data[clawMeta.data.length - 1];
+        if (pt && pt.x !== undefined) {
+          floatLobster.style.left = `${pt.x - 28}px`;
+          floatLobster.style.top = `${pt.y - 24}px`;
+          floatLobster.style.display = 'block';
+        }
+      }
+    }
+
+    const floatingMascotPlugin = {
+      id: 'floatingMascots',
+      afterRender(chart) {
+        updateFloatingMascots(chart);
+      }
+    };
+
+    async function init() {
+      let dshDaily = [24150, 85320, 112450, 118435];
+      let clawDaily = [];
+      let updatedAt = null;
+
+      try {
+        const res = await fetch('data.json');
+        if (res.ok) {
+          const json = await res.json();
+          dshDaily = json.repositories.deepseek_harness.daily_stars;
+          clawDaily = json.repositories.openclaw.daily_stars;
+          updatedAt = json.updated_at;
+        }
+      } catch (e) {
+        // Fallback for file:// preview
+      }
+
+      if (updatedAt) {
+        try {
+          const d = new Date(updatedAt);
+          const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const dateStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+          document.getElementById('lastUpdated').textContent = `Last updated: ${dateStr}, ${timeStr}`;
+        } catch (e) {}
+      }
+
+      if (!clawDaily.length) {
+        for (let i = 1; i <= 266; i++) {
+          if (i <= 40) clawDaily.push(Math.round(1 + Math.pow(i / 40, 3) * 4200));
+          else if (i <= 75) clawDaily.push(Math.round(4200 + Math.pow((i - 40) / 35, 2.2) * 167800));
+          else if (i <= 130) clawDaily.push(Math.round(172000 + Math.pow((i - 75) / 55, 0.75) * 144000));
+          else clawDaily.push(Math.round(316000 + ((i - 130) / 136) * 70424));
+        }
+      }
+
+      const dshLatest = dshDaily[dshDaily.length - 1];
+      const clawLatest = clawDaily[clawDaily.length - 1];
+      if (dshLatest) document.getElementById('dshStars').textContent = `${dshLatest.toLocaleString()} ★`;
+      if (clawLatest) document.getElementById('clawStars').textContent = `${clawLatest.toLocaleString()} ★`;
+      document.getElementById('dshDay').textContent = `Day ${dshDaily.length}`;
+      document.getElementById('clawDay').textContent = `Day ${clawDaily.length}`;
+
+      const totalDays = Math.max(dshDaily.length, clawDaily.length);
+      const labels = Array.from({ length: totalDays }, (_, i) => `Day ${i + 1}`);
+
+      const ctx = document.getElementById('chart').getContext('2d');
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        plugins: [floatingMascotPlugin],
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: '🐋 DeepSeek',
+              data: dshDaily,
+              borderColor: '#0284c7', // Ocean Blue
+              backgroundColor: '#0284c7',
+              borderWidth: 3.5,
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              pointHoverBackgroundColor: '#0284c7',
+              pointHoverBorderColor: '#ffffff',
+              pointHoverBorderWidth: 2,
+              tension: 0.15
+            },
+            {
+              label: '🦞 OpenClaw',
+              data: clawDaily,
+              borderColor: '#e11d48', // Lobster Red
+              backgroundColor: '#e11d48',
+              borderWidth: 3,
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              pointHoverBackgroundColor: '#e11d48',
+              pointHoverBorderColor: '#ffffff',
+              pointHoverBorderWidth: 2,
+              tension: 0.15
+            }
+          ]
+        },
+        options: {
+          animation: false,
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              backgroundColor: '#09090b',
+              titleFont: { size: 13, weight: '700', family: "'Plus Jakarta Sans', sans-serif" },
+              bodyFont: { size: 12.5, weight: '600', family: "'JetBrains Mono', monospace" },
+              padding: 12,
+              cornerRadius: 10,
+              displayColors: true,
+              boxWidth: 8,
+              boxHeight: 8,
+              callbacks: {
+                title: (items) => {
+                  const day = items[0].dataIndex + 1;
+                  const week = Math.ceil(day / 7);
+                  return `Day ${day} · Week ${week}`;
+                },
+                label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw ? ctx.raw.toLocaleString() : '—'} ★`
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Weeks since Day 1 inception (each vertical line = 1 week)',
+                font: { weight: '700', size: 11.5, family: "'Plus Jakarta Sans', sans-serif" }
+              },
+              grid: {
+                display: true,
+                color: (ctx) => {
+                  const day = ctx.index + 1;
+                  // Draw subtle vertical grid line for every single week
+                  if (day % 7 === 0 || day === 1 || day === totalDays) {
+                    return '#f1f1f4';
+                  }
+                  return 'transparent';
+                },
+                lineWidth: 1
+              },
+              ticks: {
+                autoSkip: false,
+                font: { family: "'Plus Jakarta Sans', sans-serif", size: 10.5 },
+                callback: function(val, index) {
+                  const day = index + 1;
+                  if (day === 1) return 'Day 1';
+                  const w = Math.round(day / 7);
+                  if (day % 14 === 0 && (totalDays - day) > 8) return `W${w}`;
+                  if (day === totalDays) return `W${Math.ceil(day/7)} (Today)`;
+                  return null;
+                }
+              }
+            },
+            y: {
+              min: 0,
+              max: 450000,
+              title: {
+                display: true,
+                text: 'GitHub Stars',
+                font: { weight: '700', size: 11.5, family: "'Plus Jakarta Sans', sans-serif" }
+              },
+              grid: {
+                color: '#f1f1f4'
+              },
+              ticks: {
+                stepSize: 90000,
+                font: { family: "'Plus Jakarta Sans', sans-serif", size: 10.5 },
+                callback: (v) => v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v
+              }
+            }
+          }
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        if (chartInstance) updateFloatingMascots(chartInstance);
+      });
+    }
+
+    function generateSnapshotBlob() {
+      return new Promise((resolve) => {
+        if (!chartInstance) return resolve(null);
+        
+        const chartCanvas = document.getElementById('chart');
+        const offCanvas = document.createElement('canvas');
+        const scale = 2;
+        const width = 1200;
+        const height = 675;
+
+        offCanvas.width = width * scale;
+        offCanvas.height = height * scale;
+        const ctx = offCanvas.getContext('2d');
+        ctx.scale(scale, scale);
+
+        // Background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+
+        // Header Title
+        ctx.fillStyle = '#09090b';
+        ctx.font = '900 32px "Plus Jakarta Sans", -apple-system, sans-serif';
+        ctx.fillText('🐋 vs 🦞', 48, 54);
+
+        // Header Subtitle
+        ctx.fillStyle = '#71717a';
+        ctx.font = '600 15px "Plus Jakarta Sans", -apple-system, sans-serif';
+        ctx.fillText('📈 The battle is on. Bring the 🍿. Updated hourly', 48, 82);
+
+        // Scoreboard Pills on Image
+        const dshStars = document.getElementById('dshStars').textContent;
+        const clawStars = document.getElementById('clawStars').textContent;
+        const dshDay = document.getElementById('dshDay').textContent;
+        const clawDay = document.getElementById('clawDay').textContent;
+
+        function drawPill(x, y, dotColor, mascot, repo, stars, day) {
+          ctx.font = '700 13px "Plus Jakarta Sans", sans-serif';
+          const repoWidth = ctx.measureText(repo).width;
+          ctx.font = '800 13.5px "JetBrains Mono", monospace';
+          const starsWidth = ctx.measureText(stars).width;
+          ctx.font = '600 11.5px "Plus Jakarta Sans", sans-serif';
+          const dayWidth = ctx.measureText(day).width;
+
+          const pillW = 20 + 16 + repoWidth + 14 + starsWidth + 12 + dayWidth + 16;
+          const pillH = 36;
+
+          ctx.fillStyle = '#fafafa';
+          ctx.strokeStyle = '#e4e4e7';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(x, y, pillW, pillH, 10);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = dotColor;
+          ctx.beginPath();
+          ctx.arc(x + 14, y + 18, 4, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.font = '14px sans-serif';
+          ctx.fillText(mascot, x + 24, y + 23);
+
+          ctx.fillStyle = '#09090b';
+          ctx.font = '700 13px "Plus Jakarta Sans", sans-serif';
+          ctx.fillText(repo, x + 44, y + 23);
+
+          const starsX = x + 44 + repoWidth + 12;
+
+          ctx.strokeStyle = '#e4e4e7';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(starsX - 6, y + 10);
+          ctx.lineTo(starsX - 6, y + 26);
+          ctx.stroke();
+
+          ctx.fillStyle = dotColor;
+          ctx.font = '800 13.5px "JetBrains Mono", monospace';
+          ctx.fillText(stars, starsX, y + 23);
+
+          ctx.fillStyle = '#71717a';
+          ctx.font = '600 11.5px "Plus Jakarta Sans", sans-serif';
+          ctx.fillText(day, starsX + starsWidth + 8, y + 23);
+
+          return pillW;
+        }
+
+        const pill1W = drawPill(48, 104, '#0284c7', '🐋', 'deepseek-ai/deepseek-harness', dshStars, dshDay);
+
+        ctx.fillStyle = '#a1a1aa';
+        ctx.font = '800 11.5px "Plus Jakarta Sans", sans-serif';
+        ctx.fillText('VS', 48 + pill1W + 12, 127);
+
+        drawPill(48 + pill1W + 38, 104, '#e11d48', '🦞', 'openclaw/openclaw', clawStars, clawDay);
+
+        // Draw Chart
+        const chartX = 48;
+        const chartY = 156;
+        const chartW = 1104;
+        const chartH = 460;
+        ctx.drawImage(chartCanvas, chartX, chartY, chartW, chartH);
+
+        // Draw Tip Emojis
+        const dshMeta = chartInstance.getDatasetMeta(0);
+        const clawMeta = chartInstance.getDatasetMeta(1);
+
+        const canvasRectW = chartCanvas.width / (window.devicePixelRatio || 1);
+        const canvasRectH = chartCanvas.height / (window.devicePixelRatio || 1);
+        const scaleX = chartW / canvasRectW;
+        const scaleY = chartH / canvasRectH;
+
+        ctx.font = '24px sans-serif';
+        if (dshMeta.data && dshMeta.data.length > 0) {
+          const pt = dshMeta.data[dshMeta.data.length - 1];
+          if (pt && pt.x !== undefined) {
+            ctx.fillText('🐋', chartX + (pt.x * scaleX) + 6, chartY + (pt.y * scaleY) + 7);
+          }
+        }
+
+        if (clawMeta.data && clawMeta.data.length > 0) {
+          const pt = clawMeta.data[clawMeta.data.length - 1];
+          if (pt && pt.x !== undefined) {
+            ctx.fillText('🦞', chartX + (pt.x * scaleX) - 26, chartY + (pt.y * scaleY) - 6);
+          }
+        }
+
+        // Footer
+        ctx.fillStyle = '#a1a1aa';
+        ctx.font = '600 13px "Plus Jakarta Sans", -apple-system, sans-serif';
+        ctx.fillText('surendranb.github.io/deepseek-vs-openclaw 🍿', 48, 646);
+
+        offCanvas.toBlob((blob) => {
+          resolve(blob);
+        }, 'image/png');
+      });
+    }
+
+    async function downloadSnapshot() {
+      const blob = await generateSnapshotBlob();
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `whale-vs-lobster-${new Date().toISOString().slice(0, 10)}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    async function copyImageToClipboard(blob) {
+      if (!blob || !navigator.clipboard || !window.ClipboardItem) return false;
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2800);
+    }
+
+    document.getElementById('btnDownload').addEventListener('click', () => {
+      downloadSnapshot();
+      showToast('Chart snapshot downloaded!');
+    });
+
+    document.getElementById('btnShareX').addEventListener('click', async () => {
+      const blob = await generateSnapshotBlob();
+      await copyImageToClipboard(blob);
+      downloadSnapshot();
+      showToast('Snapshot copied & downloaded! Opening X...');
+      const text = encodeURIComponent('📈 The battle is on. Bring the 🍿. Updated hourly:');
+      const pageUrl = encodeURIComponent(window.location.href);
+      setTimeout(() => {
+        window.open(`https://twitter.com/intent/tweet?text=${text}&url=${pageUrl}`, '_blank', 'noopener,noreferrer');
+      }, 350);
+    });
+
+    document.getElementById('btnShareLinkedIn').addEventListener('click', async () => {
+      const blob = await generateSnapshotBlob();
+      await copyImageToClipboard(blob);
+      downloadSnapshot();
+      showToast('Snapshot copied & downloaded! Opening LinkedIn...');
+      const pageUrl = encodeURIComponent(window.location.href);
+      setTimeout(() => {
+        window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${pageUrl}`, '_blank', 'noopener,noreferrer');
+      }, 350);
+    });
+
+    document.getElementById('btnCopyLink').addEventListener('click', () => {
+      navigator.clipboard.writeText(window.location.href).then(() => {
+        showToast('Link copied to clipboard! 🍿');
+      }).catch(() => {
+        showToast('URL: ' + window.location.href);
+      });
+    });
+
+    init();
+  </script>
+</body>
+</html>
