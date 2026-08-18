@@ -10,6 +10,7 @@ generate_chart.py — 🐋 vs 🦞 Star Growth Tracker
 """
 
 import json
+import math
 import os
 import re
 import urllib.request
@@ -293,6 +294,37 @@ def build_svg(data: dict) -> None:
         pts = [f"{x_coord(i):.1f},{y_coord(v):.1f}" for i, v in enumerate(vals)]
         return "M " + " L ".join(pts)
 
+    def day_path(func, from_day: int, to_day: int) -> str:
+        pts = [f"{x_coord(d - 1):.1f},{y_coord(func(d)):.1f}" for d in range(from_day, to_day + 1)]
+        return "M " + " L ".join(pts)
+
+    def ls_fit(xs: list[float], ys: list[float]) -> tuple[float, float]:
+        n = len(xs)
+        mx, my = sum(xs) / n, sum(ys) / n
+        b = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sum((x - mx) ** 2 for x in xs)
+        return my - b * mx, b
+
+    days = len(dsh)
+    red_target = claw[-1]
+
+    best_slope = (dsh[-1] - dsh[-3]) / 2.0
+    best_cross = days + (red_target - dsh[-1]) / best_slope
+
+    log_a, log_b = ls_fit([math.log(d) for d in range(2, days + 1)], dsh[1:])
+    exp_cross = math.exp((red_target - log_a) / log_b)
+
+    best_sat = None
+    for cap in range(150000, 600000, 5000):
+        for k in [x / 100 for x in range(3, 80)]:
+            ss = sum((y - cap * (1 - math.exp(-k * d))) ** 2 for d, y in zip(range(1, days + 1), dsh))
+            if best_sat is None or ss < best_sat[0]:
+                best_sat = (ss, cap, k)
+    _, sat_cap, sat_k = best_sat
+    sat_cross = -math.log(1 - red_target / sat_cap) / sat_k if sat_cap > red_target else None
+
+    dsh_path = points_to_path(dsh)
+    claw_path = points_to_path(claw)
+
     dsh_path = points_to_path(dsh)
     claw_path = points_to_path(claw)
 
@@ -350,6 +382,22 @@ def build_svg(data: dict) -> None:
   <!-- Live Mascot Emojis on Tips -->
   <text x="{dsh_tip_x + 6:.1f}" y="{dsh_tip_y + 6:.1f}" font-size="20">🐋</text>
   <text x="{claw_tip_x - 20:.1f}" y="{claw_tip_y - 8:.1f}" font-size="20">🦞</text>
+
+  <!-- Whale reference line (today's level) -->
+  <line x1="{pad_left}" y1="{dsh_tip_y:.1f}" x2="{width - pad_right}" y2="{dsh_tip_y:.1f}" stroke="#a1a1aa" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <text x="{width - pad_right}" y="{dsh_tip_y - 6:.1f}" font-size="11" fill="#71717a" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, sans-serif">🐋 today · {dsh[-1]:,}★</text>
+
+  <!-- Projection fan: best / expected / worst -->
+  <path d="{day_path(lambda d: dsh[-1] + best_slope * (d - days), days, int(math.ceil(best_cross)))}" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-dasharray="2 3" stroke-linecap="round"/>
+  <circle cx="{x_coord(int(math.ceil(best_cross)) - 1):.1f}" cy="{y_coord(red_target):.1f}" r="4" fill="#0ea5e9"/>
+  <text x="{x_coord(int(math.ceil(best_cross)) - 1):.1f}" y="{y_coord(red_target) - 8:.1f}" font-size="11" font-weight="700" fill="#0ea5e9" text-anchor="middle" paint-order="stroke" stroke="#ffffff" stroke-width="3" font-family="-apple-system, BlinkMacSystemFont, sans-serif">best · recent velocity ≈ Day {best_cross:.0f}</text>
+
+  <path d="{day_path(lambda d: log_a + log_b * math.log(d), days, int(math.ceil(exp_cross)))}" fill="none" stroke="#0284c7" stroke-width="2" stroke-dasharray="7 5" stroke-linecap="round"/>
+  <circle cx="{x_coord(int(math.ceil(exp_cross)) - 1):.1f}" cy="{y_coord(red_target):.1f}" r="4" fill="#0284c7"/>
+  <text x="{x_coord(int(math.ceil(exp_cross)) - 1):.1f}" y="{y_coord(red_target) - 8:.1f}" font-size="11" font-weight="700" fill="#0284c7" text-anchor="middle" paint-order="stroke" stroke="#ffffff" stroke-width="3" font-family="-apple-system, BlinkMacSystemFont, sans-serif">expected · log fit ≈ Day {exp_cross:.0f}</text>
+
+  <path d="{day_path(lambda d: sat_cap * (1 - math.exp(-sat_k * d)), days, max_days)}" fill="none" stroke="#a1a1aa" stroke-width="2" stroke-dasharray="4 4" stroke-linecap="round"/>
+  <text x="{width - pad_right}" y="{y_coord(sat_cap) - 6:.1f}" font-size="11" font-weight="700" fill="#a1a1aa" text-anchor="end" paint-order="stroke" stroke="#ffffff" stroke-width="3" font-family="-apple-system, BlinkMacSystemFont, sans-serif">{'worst · saturation ≈ Day %.0f' % sat_cross if sat_cross else 'worst · saturation: plateaus ~%dk★ — no catch-up' % (sat_cap // 1000)}</text>
 
   <!-- X-Axis Label -->
   <text x="{width / 2}" y="{height - 8}" font-size="11.5" font-weight="700" fill="#71717a" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif">Weeks since Day 1 inception (each vertical line = 1 week)</text>

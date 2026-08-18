@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://surendranb.github.io/deepseek-vs-openclaw/">
   <meta property="og:title" content="🐋 vs 🦞 · The Battle for GitHub's Fastest-Growing Repo">
-  <meta property="og:description" content="OpenClaw took 9 months to hit 386,584 stars. DeepSeek Harness crossed 153,414 ★ in just 6 days. Watch the race live 🍿">
+  <meta property="og:description" content="OpenClaw took 9 months to hit 386,580 stars. DeepSeek Harness crossed 153,187 ★ in just 6 days. Watch the race live 🍿">
   <meta property="og:image" content="https://surendranb.github.io/deepseek-vs-openclaw/og-image.png">
   <meta property="og:image:secure_url" content="https://surendranb.github.io/deepseek-vs-openclaw/og-image.png">
   <meta property="og:image:type" content="image/png">
@@ -21,7 +21,7 @@
   <!-- Twitter / X Metadata -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="🐋 vs 🦞 · The Battle for GitHub's Fastest-Growing Repo">
-  <meta name="twitter:description" content="OpenClaw took 9 months to hit 386,584 stars. DeepSeek Harness crossed 153,414 ★ in just 6 days. Watch the race live 🍿">
+  <meta name="twitter:description" content="OpenClaw took 9 months to hit 386,580 stars. DeepSeek Harness crossed 153,187 ★ in just 6 days. Watch the race live 🍿">
   <meta name="twitter:image" content="https://surendranb.github.io/deepseek-vs-openclaw/og-image.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -202,6 +202,15 @@
       display: flex;
       align-items: center;
       gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .projection-inline {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text-muted);
+      white-space: nowrap;
+      font-family: 'Plus Jakarta Sans', sans-serif;
     }
 
     .score-card {
@@ -439,6 +448,8 @@
         <span class="score-tally" id="clawStars">386,424 ★</span>
         <span class="score-day" id="clawDay">Day 266</span>
       </a>
+
+      <span class="projection-inline" id="projectionLine" style="display:none"></span>
     </div>
 
     <!-- Chart Arena -->
@@ -462,6 +473,7 @@
 
   <script>
     let chartInstance = null;
+    let fanCache = null;
 
     function updateFloatingMascots(chart) {
       const dshMeta = chart.getDatasetMeta(0);
@@ -496,10 +508,50 @@
       }
     };
 
+    const projectionLabelPlugin = {
+      id: 'projectionLabels',
+afterDatasetsDraw(chart) {
+        if (!fanCache) return;
+        const { ctx } = chart;
+        const created = fanCache.createdAt ? new Date(`${fanCache.createdAt}T00:00:00Z`) : null;
+        const fmt = (cross) => {
+          if (!created) return `Day ${Math.round(cross)}`;
+          const d = new Date(created);
+          d.setUTCDate(d.getUTCDate() + Math.round(cross));
+          return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+        };
+        const texts = {
+          3: { text: `current pace ≈ ${fmt(fanCache.best.cross)}`, color: '#0ea5e9', align: 'center', dx: 0 },
+          4: { text: `average pace ≈ ${fmt(fanCache.expected.cross)}`, color: '#0284c7', align: 'center', dx: 0 },
+          5: { text: fanCache.worst.cross ? `slowing pace ≈ ${fmt(fanCache.worst.cross)}` : `slowing pace: plateaus ~${Math.round(fanCache.worst.cap / 1000)}k★`, color: '#a1a1aa', align: 'end', dx: -6 },
+          2: { text: `🐋 today · ${fanCache.dshLatest.toLocaleString()}★`, color: '#71717a', align: 'end', dx: -4 }
+        };
+        ctx.save();
+        ctx.font = "700 11px 'Plus Jakarta Sans', sans-serif";
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#ffffff';
+        for (const [idx, cfg] of Object.entries(texts)) {
+          const meta = chart.getDatasetMeta(Number(idx));
+          const ds = chart.data.datasets[Number(idx)];
+          if (!meta || !ds) continue;
+          let li = -1;
+          for (let i = ds.data.length - 1; i >= 0; i--) if (ds.data[i] !== null) { li = i; break; }
+          if (li < 0 || !meta.data[li]) continue;
+          const pt = meta.data[li];
+          ctx.textAlign = cfg.align;
+          ctx.strokeText(cfg.text, pt.x + cfg.dx, pt.y - 8);
+          ctx.fillStyle = cfg.color;
+          ctx.fillText(cfg.text, pt.x + cfg.dx, pt.y - 8);
+        }
+        ctx.restore();
+      }
+    };
+
     async function init() {
       let dshDaily = [24150, 85320, 112450, 118435];
       let clawDaily = [];
       let updatedAt = null;
+      let dshCreatedAt = null;
 
       try {
         const res = await fetch('data.json');
@@ -508,6 +560,7 @@
           dshDaily = json.repositories.deepseek_harness.daily_stars;
           clawDaily = json.repositories.openclaw.daily_stars;
           updatedAt = json.updated_at;
+          dshCreatedAt = json.repositories.deepseek_harness.created_at;
         }
       } catch (e) {
         // Fallback for file:// preview
@@ -538,13 +591,87 @@
       document.getElementById('dshDay').textContent = `Day ${dshDaily.length}`;
       document.getElementById('clawDay').textContent = `Day ${clawDaily.length}`;
 
+      function lsFit(xs, ys) {
+        const n = xs.length;
+        const mx = xs.reduce((a, b) => a + b, 0) / n;
+        const my = ys.reduce((a, b) => a + b, 0) / n;
+        const b = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0) / xs.reduce((s, x) => s + (x - mx) ** 2, 0);
+        return [my - b * mx, b];
+      }
+
+      const dshDays = dshDaily.length;
+      const redTarget = clawLatest;
+      const fan = { best: null, expected: null, worst: null };
+
+      if (dshDays >= 3) {
+        const bestSlope = (dshDaily[dshDays - 1] - dshDaily[dshDays - 3]) / 2;
+        const bestCross = dshDays + (redTarget - dshDaily[dshDays - 1]) / bestSlope;
+
+        const xs = [], ys = [];
+        for (let d = 2; d <= dshDays; d++) { xs.push(Math.log(d)); ys.push(dshDaily[d - 1]); }
+        const [logA, logB] = lsFit(xs, ys);
+        const expCross = Math.exp((redTarget - logA) / logB);
+
+        let bestSat = null;
+        for (let cap = 150000; cap <= 600000; cap += 5000) {
+          for (let k = 0.03; k <= 0.8; k += 0.01) {
+            let ss = 0;
+            for (let d = 1; d <= dshDays; d++) ss += (dshDaily[d - 1] - cap * (1 - Math.exp(-k * d))) ** 2;
+            if (!bestSat || ss < bestSat[0]) bestSat = [ss, cap, k];
+          }
+        }
+        const satCap = bestSat[1], satK = bestSat[2];
+
+        fan.best = { slope: bestSlope, cross: bestCross };
+        fan.expected = { a: logA, b: logB, cross: expCross };
+        fan.worst = { cap: satCap, k: satK, cross: satCap > redTarget ? -Math.log(1 - redTarget / satCap) / satK : null };
+      }
+      fanCache = { ...fan, dshLatest: dshDaily[dshDaily.length - 1], createdAt: dshCreatedAt };
+
+      function fanSeries(total, fn, toDay) {
+        const arr = new Array(total).fill(null);
+        for (let i = dshDays - 1; i < toDay; i++) arr[i] = fn(i + 1);
+        return arr;
+      }
+
+      function endMarker(total, atIdx) {
+        const arr = new Array(total).fill(0);
+        if (atIdx < total) arr[atIdx] = 4;
+        return arr;
+      }
+
       const totalDays = Math.max(dshDaily.length, clawDaily.length);
       const labels = Array.from({ length: totalDays }, (_, i) => `Day ${i + 1}`);
+
+      const fanData = [];
+      if (fan.best) {
+        const bestTo = Math.min(Math.ceil(fan.best.cross), totalDays);
+        fanData.push({
+          label: '🐋 current pace', data: fanSeries(totalDays, (d) => dshLatest + fan.best.slope * (d - dshDays), bestTo),
+          borderColor: '#0ea5e9', borderWidth: 2, borderDash: [2, 3], pointRadius: endMarker(totalDays, bestTo - 1),
+          pointBackgroundColor: '#0ea5e9', pointHoverRadius: 0, tension: 0
+        });
+        const expTo = Math.min(Math.ceil(fan.expected.cross), totalDays);
+        fanData.push({
+          label: '🐋 average pace', data: fanSeries(totalDays, (d) => fan.expected.a + fan.expected.b * Math.log(d), expTo),
+          borderColor: '#0284c7', borderWidth: 2, borderDash: [7, 5], pointRadius: endMarker(totalDays, expTo - 1),
+          pointBackgroundColor: '#0284c7', pointHoverRadius: 0, tension: 0
+        });
+        const worstTo = fan.worst.cross ? Math.min(Math.ceil(fan.worst.cross), totalDays) : totalDays;
+        fanData.push({
+          label: '🐋 slowing pace', data: fanSeries(totalDays, (d) => fan.worst.cap * (1 - Math.exp(-fan.worst.k * d)), worstTo),
+          borderColor: '#a1a1aa', borderWidth: 2, borderDash: [4, 4], pointRadius: 0, pointHoverRadius: 0, tension: 0
+        });
+      }
+      fanData.unshift({
+        label: '🐋 today', data: fanSeries(totalDays, () => dshLatest, totalDays),
+        borderColor: '#a1a1aa', borderWidth: 1.5, borderDash: [4, 4], pointRadius: 0, pointHoverRadius: 0, tension: 0
+      });
 
       const ctx = document.getElementById('chart').getContext('2d');
       chartInstance = new Chart(ctx, {
         type: 'line',
-        plugins: [floatingMascotPlugin],
+        plugins: [floatingMascotPlugin, projectionLabelPlugin],
         data: {
           labels: labels,
           datasets: [
@@ -573,7 +700,8 @@
               pointHoverBorderColor: '#ffffff',
               pointHoverBorderWidth: 2,
               tension: 0.15
-            }
+            },
+            ...fanData
           ]
         },
         options: {
@@ -589,6 +717,7 @@
               display: false
             },
             tooltip: {
+              filter: (item) => item.datasetIndex < 2,
               backgroundColor: '#09090b',
               titleFont: { size: 13, weight: '700', family: "'Plus Jakarta Sans', sans-serif" },
               bodyFont: { size: 12.5, weight: '600', family: "'JetBrains Mono', monospace" },
@@ -663,6 +792,17 @@
       window.addEventListener('resize', () => {
         if (chartInstance) updateFloatingMascots(chartInstance);
       });
+
+      const proj = document.getElementById('projectionLine');
+      if (fan.expected) {
+        try {
+          const created = new Date(`${dshCreatedAt}T00:00:00Z`);
+          created.setUTCDate(created.getUTCDate() + Math.round(fan.expected.cross));
+          const dateStr = created.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+          proj.innerHTML = `🐋 is projected to overtake 🦞 on <span style="color:#0284c7">${dateStr}</span>`;
+          proj.style.display = 'inline-block';
+        } catch (e) {}
+      }
     }
 
     function generateSnapshotBlob() {
