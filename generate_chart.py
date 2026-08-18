@@ -161,6 +161,22 @@ def generate_og_image(data: dict) -> None:
                 pass
         return 0
 
+    def dashed_line(draw, pts, fill, width, dash=(4, 4)):
+        for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+            dx, dy = x2 - x1, y2 - y1
+            length = (dx * dx + dy * dy) ** 0.5
+            if length == 0:
+                continue
+            ux, uy = dx / length, dy / length
+            pos = 0.0
+            on = True
+            while pos < length:
+                seg = dash[0] if on else dash[1]
+                end = min(pos + seg, length)
+                draw.line([(x1 + ux * pos, y1 + uy * pos), (x1 + ux * end, y1 + uy * end)], fill=fill, width=width)
+                pos = end
+                on = not on
+
     # 1. Header Title & Subtitle
     draw_emoji('🐋', 48, 30, 36)
     draw.text((92, 32), 'vs', fill='#09090b', font=font_title)
@@ -234,6 +250,47 @@ def generate_og_image(data: dict) -> None:
     draw_emoji('🐋', dsh_last[0] + 6, dsh_last[1] - 12, 26)
     draw_emoji('🦞', claw_last[0] - 28, claw_last[1] - 24, 26)
 
+    # Whale reference line (today's level)
+    ref_y = cy + ch - (dsh[-1] / max_stars) * ch
+    dashed_line(draw, [(cx, ref_y), (cx + cw, ref_y)], '#a1a1aa', 2, (4, 4))
+    today_lbl = f'today · {dsh[-1]:,}★'
+    lbl_w = draw.textlength(today_lbl, font=font_small)
+    draw_emoji('🐋', cx + cw - 22, ref_y - 15, 12)
+    draw.text((cx + cw - 22 - 12 - lbl_w - 4, ref_y - 8), today_lbl, fill='#71717a', font=font_small)
+
+    # Projection fan: current / average / slowing pace (same math as chart.svg)
+    fan = projection(dsh, claw, data["repositories"]["deepseek_harness"]["created_at"])
+    best_slope, best_cross = fan["best_slope"], fan["best_cross"]
+    log_a, log_b = fan["log_a"], fan["log_b"]
+    exp_cross, sat_cap, sat_k, sat_cross = fan["exp_cross"], fan["sat_cap"], fan["sat_k"], fan["sat_cross"]
+    cross_date = fan["cross_date"]
+
+    def fan_pt(day_1based: int, val: float):
+        x = cx + ((day_1based - 1) / (max_days - 1)) * cw
+        y = cy + ch - (val / max_stars) * ch
+        return (min(x, cx + cw), y)
+
+    def draw_fan_label(x, y, text, color):
+        draw.text((x, y), text, fill=color, font=font_small, anchor='mm',
+                  stroke_width=3, stroke_fill=(255, 255, 255, 255))
+
+    red_y = cy + ch - (claw_stars / max_stars) * ch
+    dashed_line(draw, [fan_pt(d, dsh[-1] + best_slope * (d - len(dsh))) for d in range(len(dsh), int(math.ceil(best_cross)) + 1)], '#0ea5e9', 2, (2, 3))
+    bx, by = fan_pt(int(math.ceil(best_cross)), claw_stars)
+    draw.ellipse([bx - 4, by - 4, bx + 4, by + 4], fill='#0ea5e9')
+    draw_fan_label(bx, by - 8, f'current pace ≈ {cross_date(best_cross)}', '#0ea5e9')
+
+    dashed_line(draw, [fan_pt(d, log_a + log_b * math.log(d)) for d in range(len(dsh), int(math.ceil(exp_cross)) + 1)], '#0284c7', 2, (7, 5))
+    lx, ly = fan_pt(int(math.ceil(exp_cross)), claw_stars)
+    draw.ellipse([lx - 4, ly - 4, lx + 4, ly + 4], fill='#0284c7')
+    draw_fan_label(lx, ly - 8, f'average pace ≈ {cross_date(exp_cross)}', '#0284c7')
+
+    sat_y = cy + ch - (sat_cap / max_stars) * ch
+    dashed_line(draw, [fan_pt(d, sat_cap * (1 - math.exp(-sat_k * d))) for d in range(len(dsh), max_days + 1)], '#a1a1aa', 2, (4, 4))
+    sat_lbl = f'slowing pace ≈ {cross_date(sat_cross)}' if sat_cross else f'slowing pace: plateaus ~{sat_cap // 1000}k★ — no catch-up'
+    draw.text((cx + cw, sat_y - 6), sat_lbl, fill='#a1a1aa', font=font_small, anchor='rm',
+              stroke_width=3, stroke_fill=(255, 255, 255, 255))
+
     # Watermark
     draw.text((48, 602), 'surendranb.github.io/deepseek-vs-openclaw 🍿', fill='#a1a1aa', font=font_small)
 
@@ -269,14 +326,51 @@ def update_html_meta(data: dict) -> None:
     print(f"[SUCCESS] Updated {HTML_PATH} dynamic social metadata tags")
 
 
+def projection(dsh: list[int], claw: list[int], created: str) -> dict:
+    """Shared fan math: current pace (linear, last 2 deltas), average pace (log fit), slowing pace (saturation)."""
+    days = len(dsh)
+    red_target = claw[-1]
+
+    def ls_fit(xs: list[float], ys: list[float]) -> tuple[float, float]:
+        n = len(xs)
+        mx, my = sum(xs) / n, sum(ys) / n
+        b = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sum((x - mx) ** 2 for x in xs)
+        return my - b * mx, b
+
+    best_slope = (dsh[-1] - dsh[-3]) / 2.0
+    best_cross = days + (red_target - dsh[-1]) / best_slope
+
+    log_a, log_b = ls_fit([math.log(d) for d in range(2, days + 1)], dsh[1:])
+    exp_cross = math.exp((red_target - log_a) / log_b)
+
+    best_sat = None
+    for cap in range(150000, 600000, 5000):
+        for k in [x / 100 for x in range(3, 80)]:
+            ss = sum((y - cap * (1 - math.exp(-k * d))) ** 2 for d, y in zip(range(1, days + 1), dsh))
+            if best_sat is None or ss < best_sat[0]:
+                best_sat = (ss, cap, k)
+    _, sat_cap, sat_k = best_sat
+    sat_cross = -math.log(1 - red_target / sat_cap) / sat_k if sat_cap > red_target else None
+
+    def cross_date(cross: float) -> str:
+        return (date.fromisoformat(created) + timedelta(days=round(cross))).strftime("%b %-d, %Y")
+
+    return dict(best_slope=best_slope, best_cross=best_cross, log_a=log_a, log_b=log_b,
+                exp_cross=exp_cross, sat_cap=sat_cap, sat_k=sat_k, sat_cross=sat_cross,
+                cross_date=cross_date)
+
+
 def build_svg(data: dict) -> None:
     """Generate high-contrast SVG chart with weekly vertical grid lines."""
     dsh = data["repositories"]["deepseek_harness"]["daily_stars"]
     claw = data["repositories"]["openclaw"]["daily_stars"]
     created = data["repositories"]["deepseek_harness"]["created_at"]
 
-    def cross_date(cross: float) -> str:
-        return (date.fromisoformat(created) + timedelta(days=round(cross))).strftime("%b %-d, %Y")
+    fan = projection(dsh, claw, created)
+    best_slope, best_cross = fan["best_slope"], fan["best_cross"]
+    log_a, log_b = fan["log_a"], fan["log_b"]
+    exp_cross, sat_cap, sat_k, sat_cross = fan["exp_cross"], fan["sat_cap"], fan["sat_k"], fan["sat_cross"]
+    cross_date = fan["cross_date"]
 
     max_days = max(len(dsh), len(claw))
     max_stars = 450000
@@ -302,29 +396,8 @@ def build_svg(data: dict) -> None:
         pts = [f"{x_coord(d - 1):.1f},{y_coord(func(d)):.1f}" for d in range(from_day, to_day + 1)]
         return "M " + " L ".join(pts)
 
-    def ls_fit(xs: list[float], ys: list[float]) -> tuple[float, float]:
-        n = len(xs)
-        mx, my = sum(xs) / n, sum(ys) / n
-        b = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sum((x - mx) ** 2 for x in xs)
-        return my - b * mx, b
-
     days = len(dsh)
     red_target = claw[-1]
-
-    best_slope = (dsh[-1] - dsh[-3]) / 2.0
-    best_cross = days + (red_target - dsh[-1]) / best_slope
-
-    log_a, log_b = ls_fit([math.log(d) for d in range(2, days + 1)], dsh[1:])
-    exp_cross = math.exp((red_target - log_a) / log_b)
-
-    best_sat = None
-    for cap in range(150000, 600000, 5000):
-        for k in [x / 100 for x in range(3, 80)]:
-            ss = sum((y - cap * (1 - math.exp(-k * d))) ** 2 for d, y in zip(range(1, days + 1), dsh))
-            if best_sat is None or ss < best_sat[0]:
-                best_sat = (ss, cap, k)
-    _, sat_cap, sat_k = best_sat
-    sat_cross = -math.log(1 - red_target / sat_cap) / sat_k if sat_cap > red_target else None
 
     dsh_path = points_to_path(dsh)
     claw_path = points_to_path(claw)
