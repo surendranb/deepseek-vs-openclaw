@@ -495,10 +495,12 @@ def build_svg(data: dict) -> None:
 def update_projection_history(data: dict, fan: dict) -> None:
     """Append (run_at, projected date) per run; one point per hour, capped at 200."""
     dsh = data["repositories"]["deepseek_harness"]["daily_stars"]
+    created = data["repositories"]["deepseek_harness"]["created_at"]
+    projected_iso = (date.fromisoformat(created) + timedelta(days=round(fan["best_cross"]))).isoformat()
     entry = {
         "run_at": datetime.now(timezone.utc).isoformat(timespec="minutes"),
         "data_day": len(dsh),
-        "projected": fan["cross_date"](fan["best_cross"]),
+        "projected": projected_iso,
         "cross_day": round(fan["best_cross"], 1),
     }
     history = []

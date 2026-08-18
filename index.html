@@ -1117,12 +1117,13 @@ afterDatasetsDraw(chart) {
         empty.style.display = 'none';
         canvas.style.display = 'block';
 
-        const ord = (iso) => Date.parse(iso + 'T00:00:00Z') / 86400000;
+        const ord = (v) => new Date(v).getTime() / 86400000;
         const fmtShort = (o) => new Date(o * 86400000).toLocaleDateString([], { month: 'short', day: 'numeric' });
         const fmtFull = (o) => new Date(o * 86400000).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
         const fmtRun = (iso) => new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
         const ys = history.map((e) => ord(e.projected));
+        if (ys.some((v) => Number.isNaN(v))) throw new Error('bad data');
         const min = Math.min(...ys) - 1;
         const max = Math.max(...ys) + 1;
 
