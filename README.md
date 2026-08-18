@@ -4,4 +4,4 @@ Daily GitHub star growth trajectory starting from Day 1 (initial commit). Update
 
 **Live Page**: https://surendranb.github.io/deepseek-vs-openclaw/
 
-![Repository Growth](chart.svg)
+![Repository Growth](chart.svg?v=2)
