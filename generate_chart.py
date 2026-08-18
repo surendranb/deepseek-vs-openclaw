@@ -14,7 +14,7 @@ import math
 import os
 import re
 import urllib.request
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from PIL import Image, ImageDraw, ImageFont
 
 REPOS = {
@@ -273,6 +273,10 @@ def build_svg(data: dict) -> None:
     """Generate high-contrast SVG chart with weekly vertical grid lines."""
     dsh = data["repositories"]["deepseek_harness"]["daily_stars"]
     claw = data["repositories"]["openclaw"]["daily_stars"]
+    created = data["repositories"]["deepseek_harness"]["created_at"]
+
+    def cross_date(cross: float) -> str:
+        return (date.fromisoformat(created) + timedelta(days=round(cross))).strftime("%b %-d, %Y")
 
     max_days = max(len(dsh), len(claw))
     max_stars = 450000
@@ -387,17 +391,17 @@ def build_svg(data: dict) -> None:
   <line x1="{pad_left}" y1="{dsh_tip_y:.1f}" x2="{width - pad_right}" y2="{dsh_tip_y:.1f}" stroke="#a1a1aa" stroke-width="1.5" stroke-dasharray="4 4"/>
   <text x="{width - pad_right}" y="{dsh_tip_y - 6:.1f}" font-size="11" fill="#71717a" text-anchor="end" font-family="-apple-system, BlinkMacSystemFont, sans-serif">🐋 today · {dsh[-1]:,}★</text>
 
-  <!-- Projection fan: best / expected / worst -->
+  <!-- Projection fan: current / average / slowing pace -->
   <path d="{day_path(lambda d: dsh[-1] + best_slope * (d - days), days, int(math.ceil(best_cross)))}" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-dasharray="2 3" stroke-linecap="round"/>
   <circle cx="{x_coord(int(math.ceil(best_cross)) - 1):.1f}" cy="{y_coord(red_target):.1f}" r="4" fill="#0ea5e9"/>
-  <text x="{x_coord(int(math.ceil(best_cross)) - 1):.1f}" y="{y_coord(red_target) - 8:.1f}" font-size="11" font-weight="700" fill="#0ea5e9" text-anchor="middle" paint-order="stroke" stroke="#ffffff" stroke-width="3" font-family="-apple-system, BlinkMacSystemFont, sans-serif">best · recent velocity ≈ Day {best_cross:.0f}</text>
+  <text x="{x_coord(int(math.ceil(best_cross)) - 1):.1f}" y="{y_coord(red_target) - 8:.1f}" font-size="11" font-weight="700" fill="#0ea5e9" text-anchor="middle" paint-order="stroke" stroke="#ffffff" stroke-width="3" font-family="-apple-system, BlinkMacSystemFont, sans-serif">current pace ≈ {cross_date(best_cross)}</text>
 
   <path d="{day_path(lambda d: log_a + log_b * math.log(d), days, int(math.ceil(exp_cross)))}" fill="none" stroke="#0284c7" stroke-width="2" stroke-dasharray="7 5" stroke-linecap="round"/>
   <circle cx="{x_coord(int(math.ceil(exp_cross)) - 1):.1f}" cy="{y_coord(red_target):.1f}" r="4" fill="#0284c7"/>
-  <text x="{x_coord(int(math.ceil(exp_cross)) - 1):.1f}" y="{y_coord(red_target) - 8:.1f}" font-size="11" font-weight="700" fill="#0284c7" text-anchor="middle" paint-order="stroke" stroke="#ffffff" stroke-width="3" font-family="-apple-system, BlinkMacSystemFont, sans-serif">expected · log fit ≈ Day {exp_cross:.0f}</text>
+  <text x="{x_coord(int(math.ceil(exp_cross)) - 1):.1f}" y="{y_coord(red_target) - 8:.1f}" font-size="11" font-weight="700" fill="#0284c7" text-anchor="middle" paint-order="stroke" stroke="#ffffff" stroke-width="3" font-family="-apple-system, BlinkMacSystemFont, sans-serif">average pace ≈ {cross_date(exp_cross)}</text>
 
   <path d="{day_path(lambda d: sat_cap * (1 - math.exp(-sat_k * d)), days, max_days)}" fill="none" stroke="#a1a1aa" stroke-width="2" stroke-dasharray="4 4" stroke-linecap="round"/>
-  <text x="{width - pad_right}" y="{y_coord(sat_cap) - 6:.1f}" font-size="11" font-weight="700" fill="#a1a1aa" text-anchor="end" paint-order="stroke" stroke="#ffffff" stroke-width="3" font-family="-apple-system, BlinkMacSystemFont, sans-serif">{'worst · saturation ≈ Day %.0f' % sat_cross if sat_cross else 'worst · saturation: plateaus ~%dk★ — no catch-up' % (sat_cap // 1000)}</text>
+  <text x="{width - pad_right}" y="{y_coord(sat_cap) - 6:.1f}" font-size="11" font-weight="700" fill="#a1a1aa" text-anchor="end" paint-order="stroke" stroke="#ffffff" stroke-width="3" font-family="-apple-system, BlinkMacSystemFont, sans-serif">{'slowing pace ≈ %s' % cross_date(sat_cross) if sat_cross else 'slowing pace: plateaus ~%dk★ — no catch-up' % (sat_cap // 1000)}</text>
 
   <!-- X-Axis Label -->
   <text x="{width / 2}" y="{height - 8}" font-size="11.5" font-weight="700" fill="#71717a" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, sans-serif">Weeks since Day 1 inception (each vertical line = 1 week)</text>
