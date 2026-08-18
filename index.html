@@ -300,6 +300,70 @@
       width: 100%;
     }
 
+    /* Tabs */
+    .tabs {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .tab {
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: #71717a;
+      cursor: pointer;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .tab:hover {
+      border-color: #a1a1aa;
+      color: var(--text-main);
+    }
+
+    .tab.active {
+      background: #09090b;
+      border-color: #09090b;
+      color: #ffffff;
+    }
+
+    .tab-pane {
+      display: none;
+      width: 100%;
+      min-height: 0;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    #paneHistory {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    #historyChart {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .history-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
     /* Animated Floating Endpoint Markers */
     .floating-mascot {
       position: absolute;
@@ -452,11 +516,23 @@
       <span class="projection-inline" id="projectionLine" style="display:none"></span>
     </div>
 
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" id="tabChartBtn">Chart</button>
+      <button class="tab" id="tabHistoryBtn">Overtake Date</button>
+    </div>
+
     <!-- Chart Arena -->
-    <div class="chart-container">
+    <div class="tab-pane active chart-container" id="paneChart">
       <canvas id="chart"></canvas>
       <div class="floating-mascot whale" id="floatWhale">🐋</div>
       <div class="floating-mascot lobster" id="floatLobster">🦞</div>
+    </div>
+
+    <!-- Projection History -->
+    <div class="tab-pane" id="paneHistory">
+      <div class="history-empty" id="historyEmpty" style="display:none">No history yet — first projection is recorded on the next run.</div>
+      <canvas id="historyChart"></canvas>
     </div>
 
     <!-- Footer -->
@@ -1008,6 +1084,110 @@ afterDatasetsDraw(chart) {
         showToast('URL: ' + window.location.href);
       });
     });
+
+    let historyChart = null;
+    let historyLoaded = false;
+
+    function switchTab(name) {
+      document.getElementById('tabChartBtn').classList.toggle('active', name === 'chart');
+      document.getElementById('tabHistoryBtn').classList.toggle('active', name === 'history');
+      document.getElementById('paneChart').classList.toggle('active', name === 'chart');
+      document.getElementById('paneHistory').classList.toggle('active', name === 'history');
+      if (name === 'history') {
+        if (!historyLoaded) renderHistoryChart();
+        else if (historyChart) historyChart.resize();
+      } else if (chartInstance) {
+        chartInstance.resize();
+        updateFloatingMascots(chartInstance);
+      }
+    }
+
+    document.getElementById('tabChartBtn').addEventListener('click', () => switchTab('chart'));
+    document.getElementById('tabHistoryBtn').addEventListener('click', () => switchTab('history'));
+
+    async function renderHistoryChart() {
+      historyLoaded = true;
+      const empty = document.getElementById('historyEmpty');
+      const canvas = document.getElementById('historyChart');
+      try {
+        const res = await fetch('projection_history.json');
+        if (!res.ok) throw new Error('missing');
+        const history = await res.json();
+        if (!history || !history.length) throw new Error('empty');
+        empty.style.display = 'none';
+        canvas.style.display = 'block';
+
+        const ord = (iso) => Date.parse(iso + 'T00:00:00Z') / 86400000;
+        const fmtShort = (o) => new Date(o * 86400000).toLocaleDateString([], { month: 'short', day: 'numeric' });
+        const fmtFull = (o) => new Date(o * 86400000).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+        const fmtRun = (iso) => new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+        const ys = history.map((e) => ord(e.projected));
+        const min = Math.min(...ys) - 1;
+        const max = Math.max(...ys) + 1;
+
+        historyChart = new Chart(canvas.getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: history.map((e) => fmtRun(e.run_at)),
+            datasets: [{
+              label: 'projected overtake date',
+              data: ys,
+              borderColor: '#0284c7',
+              backgroundColor: 'rgba(2, 132, 199, 0.08)',
+              borderWidth: 2,
+              pointRadius: 3,
+              pointBackgroundColor: '#0284c7',
+              pointHoverRadius: 5,
+              tension: 0.15,
+              fill: true
+            }]
+          },
+          options: {
+            animation: false,
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#09090b',
+                titleFont: { size: 12.5, weight: '700', family: "'Plus Jakarta Sans', sans-serif" },
+                bodyFont: { size: 12.5, weight: '700', family: "'JetBrains Mono', monospace" },
+                padding: 10,
+                cornerRadius: 10,
+                displayColors: false,
+                callbacks: {
+                  title: (items) => `Run: ${items[0].label}`,
+                  label: (ctx) => ` projected: ${fmtFull(ctx.raw)}`
+                }
+              }
+            },
+            scales: {
+              x: {
+                title: { display: true, text: 'Time of run', font: { weight: '700', size: 11.5, family: "'Plus Jakarta Sans', sans-serif" } },
+                ticks: { maxTicksLimit: 12, font: { family: "'Plus Jakarta Sans', sans-serif", size: 10.5 } },
+                grid: { color: '#f1f1f4' }
+              },
+              y: {
+                title: { display: true, text: 'Projected overtake date (🐋 → 🦞)', font: { weight: '700', size: 11.5, family: "'Plus Jakarta Sans', sans-serif" } },
+                min: min,
+                max: max,
+                ticks: {
+                  stepSize: Math.max(1, Math.ceil((max - min) / 6)),
+                  font: { family: "'Plus Jakarta Sans', sans-serif", size: 10.5 },
+                  callback: (v) => fmtShort(v)
+                },
+                grid: { color: '#f1f1f4' }
+              }
+            }
+          }
+        });
+      } catch (e) {
+        canvas.style.display = 'none';
+        empty.style.display = 'flex';
+        empty.textContent = 'No history yet — first projection is recorded on the next run.';
+      }
+    }
 
     init();
   </script>

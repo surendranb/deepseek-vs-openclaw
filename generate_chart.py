@@ -43,6 +43,7 @@ CSV_PATH = "stars.csv"
 SVG_PATH = "chart.svg"
 OG_IMAGE_PATH = "og-image.png"
 HTML_PATH = "index.html"
+HISTORY_PATH = "projection_history.json"
 
 
 def fetch_stars(repo_full_name: str) -> int | None:
@@ -491,8 +492,38 @@ def build_svg(data: dict) -> None:
     print(f"[SUCCESS] Updated {SVG_PATH}")
 
 
+def update_projection_history(data: dict, fan: dict) -> None:
+    """Append (run_at, projected date) per run; one point per hour, capped at 200."""
+    dsh = data["repositories"]["deepseek_harness"]["daily_stars"]
+    entry = {
+        "run_at": datetime.now(timezone.utc).isoformat(timespec="minutes"),
+        "data_day": len(dsh),
+        "projected": fan["cross_date"](fan["best_cross"]),
+        "cross_day": round(fan["best_cross"], 1),
+    }
+    history = []
+    if os.path.exists(HISTORY_PATH):
+        try:
+            with open(HISTORY_PATH, encoding="utf-8") as f:
+                history = json.load(f)
+        except Exception:
+            history = []
+    if history and history[-1]["run_at"][:13] == entry["run_at"][:13]:
+        history[-1] = entry
+    else:
+        history.append(entry)
+    history = history[-200:]
+    with open(HISTORY_PATH, "w", encoding="utf-8") as f:
+        json.dump(history, f, indent=2)
+    print(f"[SUCCESS] Updated {HISTORY_PATH} ({len(history)} points)")
+
+
 if __name__ == "__main__":
     updated_data = update_data()
     build_svg(updated_data)
     generate_og_image(updated_data)
     update_html_meta(updated_data)
+    dsh = updated_data["repositories"]["deepseek_harness"]["daily_stars"]
+    claw = updated_data["repositories"]["openclaw"]["daily_stars"]
+    created = updated_data["repositories"]["deepseek_harness"]["created_at"]
+    update_projection_history(updated_data, projection(dsh, claw, created))
