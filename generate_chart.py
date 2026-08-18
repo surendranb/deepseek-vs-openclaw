@@ -301,13 +301,19 @@ def generate_og_image(data: dict) -> None:
 
 def update_html_meta(data: dict) -> None:
     """Update index.html OpenGraph description & title with live hourly numbers (Option B)."""
-    dsh_stars = data["repositories"]["deepseek_harness"]["daily_stars"][-1]
-    claw_stars = data["repositories"]["openclaw"]["daily_stars"][-1]
-    dsh_day = len(data["repositories"]["deepseek_harness"]["daily_stars"])
-    claw_day = len(data["repositories"]["openclaw"]["daily_stars"])
+    dsh = data["repositories"]["deepseek_harness"]["daily_stars"]
+    claw = data["repositories"]["openclaw"]["daily_stars"]
+    dsh_stars, claw_stars = dsh[-1], claw[-1]
+    dsh_day = len(dsh)
+    claw_day = len(claw)
+    created = data["repositories"]["deepseek_harness"]["created_at"]
 
     og_title = "🐋 vs 🦞 · The Battle for GitHub's Fastest-Growing Repo"
-    og_desc = f"OpenClaw took 9 months to hit {claw_stars:,} stars. DeepSeek Harness crossed {dsh_stars:,} ★ in just {dsh_day} days. Watch the race live 🍿"
+    fan = projection(dsh, claw, created)
+    og_desc = (f"OpenClaw got {claw_stars // 1000}K ★ in {round(claw_day / 30.44)} months. "
+               f"DeepSeek Harness crossed {dsh_stars // 1000}K ★ in {dsh_day} days. "
+               f"🐋 is projected to overtake 🦞 by {fan['cross_date'](fan['best_cross'])}. "
+               f"Watch the race live 🍿")
 
     if not os.path.exists(HTML_PATH):
         return
