@@ -797,7 +797,7 @@ afterDatasetsDraw(chart) {
       if (fan.expected) {
         try {
           const created = new Date(`${dshCreatedAt}T00:00:00Z`);
-          created.setUTCDate(created.getUTCDate() + Math.round(fan.expected.cross));
+          created.setUTCDate(created.getUTCDate() + Math.round(fan.best.cross));
           const dateStr = created.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
           proj.innerHTML = `🐋 is projected to overtake 🦞 on <span style="color:#0284c7">${dateStr}</span>`;
           proj.style.display = 'inline-block';
