@@ -664,5 +664,11 @@
     "data_day": 11,
     "projected": "2026-11-10",
     "cross_day": 89.3
+  },
+  {
+    "run_at": "2026-08-23T10:25+00:00",
+    "data_day": 11,
+    "projected": "2026-11-08",
+    "cross_day": 87.1
   }
 ]
