@@ -1,10 +1,10 @@
 {
-  "updated_at": "2026-08-24T11:30:02.022953+00:00",
+  "updated_at": "2026-08-24T12:52:54.886909+00:00",
   "repositories": {
     "deepseek_harness": {
       "name": "deepseek-ai/deepseek-harness",
       "created_at": "2026-08-13",
-      "current_stars": 190514,
+      "current_stars": 190752,
       "daily_stars": [
         24150,
         85320,
@@ -17,13 +17,13 @@
         181153,
         184977,
         187894,
-        190514
+        190752
       ]
     },
     "openclaw": {
       "name": "openclaw/openclaw",
       "created_at": "2025-11-24",
-      "current_stars": 387294,
+      "current_stars": 387305,
       "daily_stars": [
         22,
         44,
@@ -298,7 +298,7 @@
         387044,
         387145,
         387265,
-        387294
+        387305
       ]
     }
   }
